@@ -1,52 +1,57 @@
-from datetime import timedelta
-from decimal import Decimal as D
+"""单日对照与走弱判定（纯函数，便于逐算例测试）。"""
+from decimal import Decimal
 from app.errors import DataError
-from .values import calendar, number, whole, parts
+from app.settings import WEAK_RATIO
+from .values import calendar, number
+from .calendar import pair_baseline
+
+RATIO = Decimal(WEAK_RATIO)
+OPEN = '营业'
+CLOSED = '停业'
+MISSING = '缺报'
+# 不可比原因：停业（计划内，不算持续下滑）与缺报（应报未报，同样不断区间但需说明）。
+NON_COMPARABLE = {CLOSED: 'NOT_OPEN', MISSING: 'BASE_MISSING'}
 
 
-def index(text, start, weeks):
-    result = {}
-    for item in parts(text):
-        raw_day, sep, raw_amount = item.partition(':')
-        if not sep:
-            raise DataError('FISCAL_FORMAT', '日销售须包含日期和销售额')
-        day = calendar(raw_day)
-        offset = (day-start).days
-        if not 0 <= offset < weeks*7:
-            raise DataError('FISCAL_SPAN', f'{day} 超出本财年')
-        amount = None if raw_amount == '停业' else number(raw_amount, -10**8, 10**8)
-        if offset in result and result[offset] != amount:
-            raise DataError('FISCAL_CONFLICT', f'{day} 有互相矛盾的营业记录')
-        result[offset] = amount
-    return result
+def _amount(raw, allow_blank):
+    text = (raw or '').strip()
+    if not text:
+        if allow_blank:
+            return None
+        raise DataError('REQUIRED', '营业日须填写本年销售额')
+    return number(text, -10 ** 8, 10 ** 8)
 
 
-def evaluate(row):
-    previous, current = calendar(row['上年期首']), calendar(row['本年期首'])
-    prev_count, cur_count = whole(row['上年周数'], 52, 53), whole(row['本年周数'], 52, 53)
-    if previous.weekday() or current-previous != timedelta(weeks=prev_count):
-        raise DataError('FISCAL_BOUNDARY', '期首须为周一，且两期连续')
-    before = index(row['上年日销售'], previous, prev_count)
-    after = index(row['本年日销售'], current, cur_count)
-    delta, used, skipped = D(0), 0, 0
-    weeks = {}
-    for offset in sorted(before.keys() | after.keys()):
-        a,b = before.get(offset), after.get(offset)
-        if offset >= 364 or a is None or b is None:
-            skipped += 1
-            continue
-        value = b-a
-        week = offset//7+1
-        weeks[week] = weeks.get(week, D(0))+value
-        delta += value
-        used += 1
-    if not used:
-        raise DataError('FISCAL_NO_PAIR', '共有财周内没有双方营业日')
-    proof = []
-    for week, value in weeks.items():
-        period = ((week-1)//13)*3 + (1 if (week-1)%13<4 else 2 if (week-1)%13<8 else 3)
-        proof.append((f'第{period:02}期 W{week:02}', value, '元'))
-    extra = sum((amount for offset, amount in after.items() if offset >= 364 and amount is not None), D(0))
-    previous_extra = sum((amount for offset, amount in before.items() if offset >= 364 and amount is not None), D(0))
-    proof += [('双方营业',used,'日'),('未配对',skipped,'日'),('本年闰周',extra,'元'),('上年闰周',previous_extra,'元')]
-    return delta, proof
+def classify_day(record):
+    """把一条已采信的门店-日记录归一成对照结论。
+
+    返回 dict：day/status/可比与否/基准、本年值、阈值、降幅、财周标签、原因码。
+    无法判定时抛 DataError，由上层作为坏行隔离（记录不丢失）。
+    """
+    day = calendar(record['fields']['营业日期'])
+    baseline_date, week, weekday, label = pair_baseline(day)
+    status = record['status']
+    base = {
+        'key': record['key'], 'line': record['line'], 'revision': record['revision'],
+        'day': day.isoformat(), 'baseline_day': baseline_date.isoformat(),
+        'fiscal_week': week, 'weekday': weekday, 'calendar': label, 'status': status,
+    }
+    if status in NON_COMPARABLE:
+        base.update(comparable=False, code=NON_COMPARABLE[status],
+                    detail='计划停业' if status == CLOSED else '当日缺报，待补',
+                    amount=None, baseline=None, threshold=None, decline=None)
+        return base
+    amount = _amount(record['fields']['本年日销售'], allow_blank=False)
+    baseline = _amount(record['fields']['上年同星期日销售'], allow_blank=True)
+    if baseline is None:
+        base.update(comparable=False, code='NO_BASELINE', detail='缺少上年同星期营业基准',
+                    amount=str(amount), baseline=None, threshold=None, decline=None)
+        return base
+    threshold = (baseline * RATIO).quantize(Decimal('0.01'))
+    weak = amount < threshold
+    decline = amount - baseline
+    base.update(comparable=True, weak=weak, code='WEAK' if weak else 'OK',
+                detail='低于同星期基准八成' if weak else '达到同星期基准八成',
+                amount=str(amount), baseline=str(baseline), threshold=str(threshold),
+                decline=str(decline))
+    return base

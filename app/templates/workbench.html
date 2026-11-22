@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>财周对照台</title>
+  <title>门店低销预警台</title>
   <link rel="stylesheet" href="/static/theme.css">
   <link rel="stylesheet" href="/static/calendar.css">
   <script type="module" src="/static/workspace.js"></script>
@@ -11,53 +11,55 @@
 <body class="calendar">
   <div class="workbench">
     <aside class="rail">
-      <a class="brand" href="/"><span aria-hidden="true">◫</span><b>财周对照台</b></a>
+      <a class="brand" href="/"><span aria-hidden="true">◫</span><b>门店低销预警台</b></a>
       <nav aria-label="业务模块">
         {% for slug, label in tabs.items() %}<a href="#{{ slug }}" data-module="{{ slug }}">{{ label }}</a>{% endfor %}
       </nav>
-      <small>连锁零售经营分析员</small>
+      <small>{{ role }}</small>
     </aside>
     <div class="desk">
-      <header class="toolbar"><span>门店财周单</span><span class="edition">规则 1.0</span><a class="btn" id="export" hidden>导出证据</a></header>
+      <header class="toolbar"><span>同星期对照 · 低销预警</span><span class="edition">规则 {{ version }}</span><a class="btn" id="export" hidden>导出证据</a></header>
       <main>
-        <section class="mast"><h1>财周对照台</h1><div class="clock"><small>零售月结</small><time id="created"></time></div></section>
-        <section class="kpis" aria-label="批次指标"><div class="kpi"><small>净差</small><strong data-count="delta">—</strong><span>元</span></div>
-<div class="kpi"><small>来源记录</small><strong data-count="input">—</strong><span>条</span></div>
-<div class="kpi"><small>有效</small><strong data-count="accepted">—</strong><span>条</span></div>
-<div class="kpi"><small>隔离</small><strong data-count="rejected">—</strong><span>条</span></div>
-<div class="kpi"><small>账差</small><strong data-count="mismatched">—</strong><span>条</span></div>
+        <section class="mast"><h1>门店低销预警台</h1><div class="clock"><small>区域值班 · 上年同星期</small><time id="created"></time></div></section>
+        <section class="kpis" aria-label="批次指标">
+          <div class="kpi"><small>预警区间</small><strong data-count="intervals">—</strong><span>个</span></div>
+          <div class="kpi"><small>走弱营业日</small><strong data-count="weak">—</strong><span>天</span></div>
+          <div class="kpi"><small>不可比日</small><strong data-count="non_comparable">—</strong><span>天</span></div>
+          <div class="kpi"><small>隔离坏行</small><strong data-count="rejected">—</strong><span>条</span></div>
+          <div class="kpi"><small>待确认</small><strong data-count="open_count">—</strong><span>个</span></div>
         </section>
         <div class="grid">
     <section class="panel source" aria-labelledby="input-title">
       <div class="panel__head"><h2 id="input-title">日销清单</h2><small>CSV</small></div>
       <form id="source" class="panel__body">
-        <div class="actions"><button type="submit" class="btn btn--primary">运行可比财周</button>
-        <button type="button" id="sample" class="btn">载入样例</button></div>
-        <details><summary>导入来源与外部账</summary>
-          <label>来源文件 <input id="source-file" type="file" accept=".csv,text/csv"></label>
-          <textarea id="source-csv" aria-label="原始记录 CSV" rows="4"></textarea>
-          <label>外部账 <input id="book-file" type="file" accept=".csv,text/csv"></label>
-          <textarea id="book-csv" aria-label="外部账 CSV" rows="4"></textarea>
+        <div class="actions"><button type="submit" class="btn btn--primary">运行低销检测</button>
+        <button type="button" id="sample" class="btn">载入样例</button>
+        <button type="button" id="confirm-batch" class="btn" hidden>确认本批（月结归因）</button></div>
+        <details><summary>导入日销与门店清单</summary>
+          <label>日销文件 <input id="source-file" type="file" accept=".csv,text/csv"></label>
+          <textarea id="source-csv" aria-label="日销 CSV" rows="4"></textarea>
+          <label>门店清单 <input id="book-file" type="file" accept=".csv,text/csv"></label>
+          <textarea id="book-csv" aria-label="门店清单 CSV" rows="3"></textarea>
         </details>
         <output id="notice" role="status"></output>
       </form>
     </section>
 
     <section class="panel results" aria-labelledby="phase">
-      <div class="panel__head"><h2 id="phase">可比财周</h2><span class="num" id="run-id"></span></div>
-      <div id="tools" class="filters" hidden><label>筛选 <input id="filter" type="search" placeholder="门店财周单 / 原因" maxlength="80"></label>
-        <label id="only-differences" hidden><input id="differences" type="checkbox"> 只看差异</label><output id="shown"></output></div>
+      <div class="panel__head"><h2 id="phase">低销预警</h2><span class="num" id="run-id"></span></div>
+      <div id="tools" class="filters" hidden><label>筛选 <input id="filter" type="search" placeholder="门店 / 区域 / 原因" maxlength="80"></label>
+        <label id="only-open-wrap" hidden><input id="only-open" type="checkbox"> 只看待确认</label><output id="shown"></output></div>
       <div class="scroll" id="grid-data"><p class="empty">运行本班样例</p></div>
       <form id="review" class="panel__body" hidden>
-        <label>复核意见 <textarea id="review-note" maxlength="500" rows="2"></textarea></label>
+        <label>处理意见 <textarea id="review-note" maxlength="500" rows="2"></textarea></label>
         <div class="actions"><label>结论 <select id="decision"><option>确认</option><option>退回</option></select></label>
-        <button class="btn btn--primary" type="submit">提交复核</button></div>
+        <button class="btn btn--primary" type="submit">提交值班意见</button></div>
       </form>
     </section>
 
     <article class="panel signal" id="evidence-panel" data-instrument="period">
-      <div class="panel__head"><h2>配对周差额</h2><span class="num" id="evidence-key"></span></div>
-      <div class="panel__body" id="signal" aria-live="polite"><p class="empty">选择一条复算记录</p></div>
+      <div class="panel__head"><h2>预警依据</h2><span class="num" id="evidence-key"></span></div>
+      <div class="panel__body" id="signal" aria-live="polite"><p class="empty">选择一条预警区间</p></div>
     </article></div>
       </main>
       <footer class="statusbar"><span id="state" role="status">等待输入</span><a href="/openapi.json">接口</a><span>UTC</span></footer>

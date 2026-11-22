@@ -31,3 +31,6 @@ target/
 *.o
 *.obj
 .DS_Store
+
+# 本地自举的 Python 依赖（沙箱无 pip/venv）
+.pydeps/

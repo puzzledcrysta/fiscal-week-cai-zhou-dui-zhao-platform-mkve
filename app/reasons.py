@@ -5,10 +5,14 @@ REASONS = {
     'TIMESTAMP': '时间需包含偏移量', 'NUMBER': '数字无法归一', 'RANGE': '数字越界',
     'EXACT_DUP': '同版本重复传输', 'SUPERSEDED': '已被更新版本代替',
     'REV_CONFLICT': '最高版本证据有冲突', 'BUSINESS': '业务规则无法判定',
-    'MISSING_BOOK': '外部账缺少业务键', 'MISSING_RESULT': '复算结果缺少业务键',
-    'AMOUNT_DELTA': '复算与外部账计量不同', 'BOOK_CONFLICT': '独立账含重复业务键',
-    'RUN_UNKNOWN': '没有此批次', 'DEMO_UNKNOWN': '没有此样例', 'STALE': '复核版本已过期',
-    'REVIEW_NOTE': '有差异时须填写复核意见', 'REVIEW_DECISION': '复核结论无效',
+    'RUN_UNKNOWN': '没有此批次', 'DEMO_UNKNOWN': '没有此样例', 'STALE': '确认版本已过期',
+    'REVIEW_NOTE': '退回或有未确认预警时须填写处理意见', 'REVIEW_DECISION': '确认结论无效',
+    'DATE': '日期格式无效', 'REV_BLOCKED': '较新来源尚未采信',
+    # 低销域
+    'FISCAL_SPAN': '营业日超出财年范围', 'FISCAL_LEAP': '上年闰周无同星期基准',
+    'DAY_CONFLICT': '同日营业记录互相冲突', 'STATUS_INVALID': '营业状态取值无效',
+    'BASE_MISSING': '上年同星期基准缺失', 'NOT_OPEN': '当日门店未营业，不参与对照',
+    'NO_BASELINE': '缺少同星期营业基准', 'SIGNAL_UNKNOWN': '没有此预警区间',
+    'ALERT_LOCKED': '已确认预警不可变更', 'ALERT_REGRESSED': '新版本不得倒退既有预警',
+    'BOOK_CONFLICT': '门店清单含重复门店', 'BOOK_KEY': '门店清单缺少门店编号',
 }
-
-REASONS.update({'FISCAL_FORMAT': '日销售格式', 'FISCAL_SPAN': '销售日越界', 'FISCAL_CONFLICT': '销售记录冲突', 'FISCAL_BOUNDARY': '财年边界不符', 'FISCAL_NO_PAIR': '无可比营业日', 'DATE': '日期格式无效', 'REV_BLOCKED': '较新来源尚未采信'})

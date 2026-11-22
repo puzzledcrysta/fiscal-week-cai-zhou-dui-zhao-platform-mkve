@@ -1,60 +1,49 @@
 from decimal import Decimal
 import pytest
 from app.errors import DataError
-from app.modules.domain.rule import evaluate
+from app.modules.domain.rule import classify_day
+from app.modules.domain.calendar import CURRENT
 
 
-def test_leap_week(cases):
-    # TRAP-107
-    actual, proof = evaluate(cases['leap_week'])
-    assert actual == Decimal('20')
-    assert Decimal(str(dict((label, value) for label, value, _ in proof)['上年闰周'])) == Decimal('1100')
+def rec(case):
+    return {'key': '00101', 'line': 2, 'revision': 1, 'status': case['营业状态'],
+            'fields': {'营业日期': case['营业日期'], '本年日销售': case['本年日销售'],
+                       '上年同星期日销售': case['上年同星期日销售']}}
 
 
-def test_closed_excluded(cases):
-    actual, proof = evaluate(cases['closed_excluded'])
-    assert actual == Decimal('20')
-    assert Decimal(str(dict((label, value) for label, value, _ in proof)['未配对'])) == Decimal('1')
+def test_weak_day_below_eighty_percent(cases):
+    out = classify_day(rec(cases['weak_day']))
+    assert out['code'] == 'WEAK' and out['weak'] is True
+    assert Decimal(out['threshold']) == Decimal('800.00')
+    assert Decimal(out['decline']) == Decimal('-300')
 
 
-def test_negative_delta(cases):
-    actual, proof = evaluate(cases['negative_delta'])
-    assert actual == Decimal('-30.75')
-    assert proof
+def test_threshold_boundary_is_not_weak(cases):
+    out = classify_day(rec(cases['ok_day']))
+    # 恰好等于 0.8 倍基准不算走弱（严格小于才触发）。
+    assert out['code'] == 'OK' and out['weak'] is False
 
 
-def test_zero_counts(cases):
-    actual, proof = evaluate(cases['zero_counts'])
-    assert actual == Decimal('45')
-    assert Decimal(str(dict((label, value) for label, value, _ in proof)['双方营业'])) == Decimal('1')
+def test_closed_day_is_non_comparable_with_reason(cases):
+    out = classify_day(rec(cases['closed_day']))
+    assert out['comparable'] is False and out['code'] == 'NOT_OPEN'
+    assert out['amount'] is None and '停业' in out['detail']
 
 
-def test_no_double_count(cases):
-    actual, proof = evaluate(cases['no_double_count'])
-    assert actual == Decimal('10')
-    assert proof
+def test_missing_report_is_non_comparable_but_kept(cases):
+    out = classify_day(rec(cases['missing_day']))
+    assert out['comparable'] is False and out['code'] == 'BASE_MISSING'
+    assert out['status'] == '缺报'
 
 
-def test_period_transition(cases):
-    actual, proof = evaluate(cases['period_transition'])
-    assert actual == Decimal('20')
-    assert Decimal(str(dict((label, value) for label, value, _ in proof)['第02期 W05'])) == Decimal('15')
+def test_missing_baseline_does_not_count_as_weak(cases):
+    out = classify_day(rec(cases['no_baseline']))
+    assert out['comparable'] is False and out['code'] == 'NO_BASELINE'
 
 
-def test_calendar_boundary(cases):
+def test_open_day_requires_amount():
+    bad = rec({'营业日期': CURRENT.day_at(1, 0).isoformat(), '营业状态': '营业',
+               '本年日销售': '', '上年同星期日销售': '1000'})
     with pytest.raises(DataError) as error:
-        evaluate(cases['calendar_boundary'])
-    assert error.value.code == 'FISCAL_BOUNDARY'
-
-
-def test_conflicting_day(cases):
-    with pytest.raises(DataError) as error:
-        evaluate(cases['conflicting_day'])
-    assert error.value.code == 'FISCAL_CONFLICT'
-
-
-def test_outside_year(cases):
-    # TRAP-23
-    with pytest.raises(DataError) as error:
-        evaluate(cases['outside_year'])
-    assert error.value.code == 'FISCAL_SPAN'
+        classify_day(bad)
+    assert error.value.code == 'REQUIRED'

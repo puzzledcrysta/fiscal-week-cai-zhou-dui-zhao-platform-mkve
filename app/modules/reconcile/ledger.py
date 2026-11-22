@@ -1,23 +1,25 @@
 from app.errors import DataError
-from app.settings import KEY, UNIT
-from app.modules.domain.values import number
+from app.settings import KEY
 from app.modules.intake.reader import decode, records
 
+REQUIRED_HEADER = [KEY, '门店名称', '区域']
 
-def ledger(payload):
+
+def stores(payload):
+    """门店主数据：门店编号 -> (名称, 区域, 来源行)。重复编号整单拒绝。"""
     text, _ = decode(payload)
     rows = iter(records(text))
-    _, header = next(rows,(0,[]))
-    if header != [KEY, f'外部记录值({UNIT})']:
-        raise DataError('HEADER','外部账表头或计量单位不符')
+    _, header = next(rows, (0, []))
+    if header != REQUIRED_HEADER:
+        raise DataError('HEADER', f'门店清单表头须为 {",".join(REQUIRED_HEADER)}')
     by_key = {}
-    for line,row in rows:
+    for line, row in rows:
         if not row or not any(value.strip() for value in row):
             continue
-        if len(row)!=2 or not row[0].strip():
-            raise DataError('WIDTH',f'外部账第 {line} 行缺少业务键或计量')
+        if len(row) != 3 or not row[0].strip():
+            raise DataError('WIDTH', f'门店清单第 {line} 行字段不完整')
         key = row[0].strip()
         if key in by_key:
-            raise DataError('BOOK_CONFLICT',f'外部账第 {line} 行重复业务键 {key}')
-        by_key[key] = (number(row[1]),line)
+            raise DataError('BOOK_CONFLICT', f'门店清单第 {line} 行重复门店 {key}')
+        by_key[key] = (row[1].strip() or key, row[2].strip() or '未分区', line)
     return by_key

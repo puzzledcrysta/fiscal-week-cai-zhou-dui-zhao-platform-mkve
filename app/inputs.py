@@ -33,7 +33,7 @@ class Source(BaseModel):
     demo: Literal['shift'] = 'shift'
 
     def raw(self):
-        return input_bytes(self.data, self.data_base64, SAMPLE_ROOT/'shift.csv')
+        return input_bytes(self.data, self.data_base64, SAMPLE_ROOT / 'shift.csv')
 
 
 class Paired(Source):
@@ -41,17 +41,17 @@ class Paired(Source):
     book_base64: EncodedCsv | None = None
 
     def ledger(self):
-        return input_bytes(self.book, self.book_base64, SAMPLE_ROOT/'external.csv')
+        return input_bytes(self.book, self.book_base64, SAMPLE_ROOT / 'external.csv')
 
 
 class Review(BaseModel):
     version: int = Field(ge=0)
-    decision: Literal['确认','退回']
-    note: str = Field(default='',max_length=500)
+    decision: Literal['确认', '退回']
+    note: str = Field(default='', max_length=500)
 
 
 def read_sample(name):
-    choices = {'shift':'shift.csv','external':'external.csv'}
+    choices = {'shift': 'shift.csv', 'external': 'external.csv'}
     if name not in choices:
-        raise DataError('DEMO_UNKNOWN','没有此样例',404)
+        raise DataError('DEMO_UNKNOWN', '没有此样例', 404)
     return SAMPLE_ROOT.joinpath(choices[name]).read_bytes()
